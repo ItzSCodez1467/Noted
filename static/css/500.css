@@ -1,0 +1,25 @@
+@import url('https://fonts.googleapis.com/css2?family=Architects+Daughter&display=swap');
+
+body {
+    background-color: rgb(54, 54, 54) !important;
+    font-family: "Architects Daughter", cursive !important;
+    font-weight: 400 !important;
+    font-style: normal !important;
+}
+
+.Header {
+    padding-top: 1%;
+    color: white;
+    font-size: 15em;
+    font-weight: bolder;
+}
+
+.subHeader {
+    color: white;
+    font-size: 50px;
+}
+
+.error {
+    color: rgb(255, 0, 0);
+    font-size: 20px;
+}
