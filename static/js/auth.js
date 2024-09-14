@@ -29,9 +29,10 @@ async function validateToken(token) {
 }
 
 async function getUserData(token) {
-    if (!token) {
-        alert('ESE- External Server Error');
+    if (!token || !validateToken(token)) {
+        alert('User not logged in. Cannot fetch user data.');
         console.log("While getting userData, token was not mentioned");
+        window.location = '/login'
         return null;
     }
 
@@ -44,4 +45,18 @@ async function getUserData(token) {
     });
     return await response.json();
     
+}
+
+function getAuthHeaders(token, content_type='application/json') {
+        if (!token || !validateToken(token)) {
+            alert('User not logged in. Cannot create authorization headers.');
+            console.log("While getting userData, token was not mentioned");
+            window.location = '/login'
+            return null;
+        };
+
+        return {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': content_type
+        };
 }

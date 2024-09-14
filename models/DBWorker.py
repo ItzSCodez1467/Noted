@@ -51,7 +51,9 @@ class DBWorker:
             created_on REAL NOT NULL,
             updated_on REAL NOT NULL,
             user_idx INTEGER NOT NULL,
-            FOREIGN KEY (user_idx) REFERENCES users(user_idx) ON DELETE CASCADE ON UPDATE NO ACTION
+            tag_idx INTEGER NOT NULL,
+            FOREIGN KEY (user_idx) REFERENCES users(user_idx) ON DELETE CASCADE ON UPDATE NO ACTION,
+            FOREIGN KEY (tag_idx) REFERENCES tags(tag_idx) ON DELETE CASCADE ON UPDATE NO ACTION
         )
         '''
 

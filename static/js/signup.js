@@ -32,6 +32,14 @@ function basicValidation(username, password) {
 document.getElementById('signupForm').addEventListener('submit', async function(event) {
     event.preventDefault();
 
+    // Get the reCAPTCHA response
+    const recaptchaResponse = grecaptcha.getResponse();
+    
+    if (recaptchaResponse.length === 0) {
+        alert('Please complete the reCAPTCHA');
+        return; // Stop form submission if reCAPTCHA is not completed
+    }
+
     const username = document.getElementById('username').value;
     const password = document.getElementById('password').value;
 
@@ -42,6 +50,7 @@ document.getElementById('signupForm').addEventListener('submit', async function(
     const formData = new FormData();
     formData.append('username', username);
     formData.append('password', password);
+    formData.append('g-recaptcha-response', recaptchaResponse); // Append reCAPTCHA response
 
     try {
         const response = await fetch('/signup', {

@@ -1,13 +1,14 @@
 from flask import Flask, render_template, request, jsonify, Response
 from .DBWorker import DBWorker, close
-from enviromentReader import getSecretKey
+from enviromentReader import getSecretKey, getRecaptchaSecretKey
 from secured import hashPassword, verify
 from collections.abc import Iterable
 from datetime import datetime, timedelta
-from typing import Union, Any
+from typing import Union, Any, Tuple, List, Dict
 import sqlite3
 import jwt
 from functools import wraps
+import requests
 
 class Noted:
 
@@ -16,6 +17,7 @@ class Noted:
         self.app = app
         self.dbw = DBWorker()
         self.SECRET = getSecretKey()
+        self.RECAPTCHA_SECRET = getRecaptchaSecretKey()
 
         # Application Routes
         @app.route('/')
@@ -26,7 +28,7 @@ class Noted:
             else:
                 _nt = int(b)
 
-            return render_template('index.html', notesTaken=_nt)
+            return render_template('index.html', notes_taken=_nt)
 
         @app.route('/signup', methods=['GET', 'POST'])
         def signup():
@@ -36,6 +38,10 @@ class Noted:
                 try:
                     username = request.form.get('username')
                     password = request.form.get('password')
+                    recaptcha_response = request.form.get('g-recaptcha-response')
+
+                    if not self.verifyRecaptcha(recaptcha_response):
+                        return jsonify({'error': 'reCAPTCHA verification failed.'}), 400
 
                     if not username or not password:
                         print("Missing username or password")
@@ -62,6 +68,10 @@ class Noted:
                 try:
                     username = request.form.get('username')
                     password = request.form.get('password')
+                    recaptcha_response = request.form.get('g-recaptcha-response')
+
+                    if not self.verifyRecaptcha(recaptcha_response):
+                        return jsonify({'error': 'reCAPTCHA verification failed.'}), 400
 
                     if not username or not password:
                         print("Missing username or password")
@@ -113,6 +123,12 @@ class Noted:
             user_data.pop('password', None)
             return user_data
 
+        @app.route('/getNotes', methods=['POST'])
+        @self.user_auth()
+        def getNotes(user_data):
+            uid = user_data['user_idx']
+            return self.pullNotesByUserIDX(uid)
+
         @app.route('/dash', methods=['GET'])
         def dash():
             return render_template('dashboard.html')
@@ -161,10 +177,6 @@ class Noted:
                 # Now pull the user data by username
                 user_data, _ = self.pullUserByUserName(tokenData['user'])
                 user_data = dict(user_data)
-                readable_create_ts = datetime.fromtimestamp(user_data['created_on']).strftime('%d-%m-%Y %H:%M:%S %p')
-                readable_update_ts = datetime.fromtimestamp(user_data['updated_on']).strftime('%d-%m-%Y %H:%M:%S %p')
-                user_data['readable_created_on'] = readable_create_ts
-                user_data['readable_updated_on'] = readable_update_ts
 
                 if not user_data:
                     # If user data isn't found, return custom unauthorized response
@@ -242,12 +254,56 @@ class Noted:
 
             column_names = ['user_idx', 'username', 'password', 'created_on', 'updated_on']
             row_dict = dict(zip(column_names, row))
+            readable_create_ts = datetime.fromtimestamp(float(row_dict['created_on'])).strftime('%d-%m-%Y %H:%M:%S %p')
+            readable_update_ts = datetime.fromtimestamp(float(row_dict['updated_on'])).strftime('%d-%m-%Y %H:%M:%S %p')
+            row_dict['readable_created_on'] = readable_create_ts
+            row_dict['readable_updated_on'] = readable_update_ts
             return row_dict, 200
         except Exception as e:
             print(f"Error in pullUserByUserName: {e}")
             return None, 501
         finally:
             close(conn)
+
+    def pullNotesByUserIDX(self, user_idx) -> Union[tuple[None, int], list[dict[str, str]]]:
+        conn, curr = self.dbw.connect()
+        q1 = 'SELECT * FROM notes WHERE user_idx = ?'
+        p1 = (user_idx,)
+
+        try:
+            curr.execute(q1, p1)
+            rows = curr.fetchall()
+            if rows is None:
+                return None, 404
+
+            rows_dict = []
+            for row in rows:
+                colum_names = ['note_idx', 'note_title', 'note_text', 'created_on', 'updated_on', 'user_idx', 'tag_idx']
+                row_dict = dict(zip(colum_names, row))
+                readable_create_ts = datetime.fromtimestamp(float(row_dict['created_on'])).strftime('%d-%m-%Y %H:%M:%S %p')
+                readable_update_ts = datetime.fromtimestamp(float(row_dict['updated_on'])).strftime('%d-%m-%Y %H:%M:%S %p')
+                row_dict['readable_created_on'] = readable_create_ts
+                row_dict['readable_updated_on'] = readable_update_ts
+                rows_dict.append(row_dict)
+            return rows_dict
+
+
+
+        except Exception as e:
+            print(f"Error in pullNotesByUserIDX: {e}")
+            return None, 501
+        finally:
+            close(conn)
+
+    def verifyRecaptcha(self, recaptcha_res):
+        payload = {
+            'secret': self.RECAPTCHA_SECRET,
+            'response': recaptcha_res
+        }
+
+        res = requests.post('https://www.google.com/recaptcha/api/siteverify', data=payload)
+        result = res.json()
+        return result.get('success')
 
 
     def run(self,
