@@ -100,7 +100,7 @@ class Noted:
 
         @app.route('/verifyToken', methods=['POST'])
         @self.user_auth()
-        def verifyToken():
+        def verifyToken(user_data):
             return jsonify({
                 'status': 200,
                 'message': 'Token Valid',
@@ -150,7 +150,7 @@ class Noted:
                     return jsonify({'status': 500, 'message': f"An error occurred: {str(e)}", 'isValid': False}), 500
 
                 # Now pull the user data by username
-                user_data = self.pullUserByUserName(tokenData['username'])
+                user_data = self.pullUserByUserName(tokenData['user'])
 
                 if not user_data:
                     # If user data isn't found, return custom unauthorized response
