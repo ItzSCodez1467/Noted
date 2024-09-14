@@ -27,3 +27,21 @@ async function validateToken(token) {
         return false;
     }
 }
+
+async function getUserData(token) {
+    if (!token) {
+        alert('ESE- External Server Error');
+        console.log("While getting userData, token was not mentioned");
+        return null;
+    }
+
+    const response = await fetch('/getUserData', {
+        method: 'POST',
+        headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+        }
+    });
+    return await response.json();
+    
+}

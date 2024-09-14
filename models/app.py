@@ -100,12 +100,22 @@ class Noted:
 
         @app.route('/verifyToken', methods=['POST'])
         @self.user_auth()
-        def verifyToken(user_data):
+        def verifyToken(_):
             return jsonify({
                 'status': 200,
                 'message': 'Token Valid',
                 'isValid': True
             }), 200
+
+        @app.route('/getUserData', methods=['POST'])
+        @self.user_auth()
+        def getUserData(user_data):
+            user_data.pop('password', None)
+            return user_data
+
+        @app.route('/dash', methods=['GET'])
+        def dash():
+            return render_template('dashboard.html')
 
         # Error handlers
         @app.errorhandler(404)
@@ -121,7 +131,6 @@ class Noted:
             @wraps(f)
             def decorated_function(*args, **kwargs):
                 token = request.headers.get('Authorization', '').split('Bearer ')[-1].strip()
-
                 try:
                     tokenData = jwt.decode(
                         token,
@@ -150,7 +159,12 @@ class Noted:
                     return jsonify({'status': 500, 'message': f"An error occurred: {str(e)}", 'isValid': False}), 500
 
                 # Now pull the user data by username
-                user_data = self.pullUserByUserName(tokenData['user'])
+                user_data, _ = self.pullUserByUserName(tokenData['user'])
+                user_data = dict(user_data)
+                readable_create_ts = datetime.fromtimestamp(user_data['created_on']).strftime('%d-%m-%Y %H:%M:%S %p')
+                readable_update_ts = datetime.fromtimestamp(user_data['updated_on']).strftime('%d-%m-%Y %H:%M:%S %p')
+                user_data['readable_created_on'] = readable_create_ts
+                user_data['readable_updated_on'] = readable_update_ts
 
                 if not user_data:
                     # If user data isn't found, return custom unauthorized response

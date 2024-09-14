@@ -53,7 +53,7 @@ document.getElementById('signupForm').addEventListener('submit', async function(
         if (data.status === 201) {
             alert("Successfully Created!");
             setToken(data.token);   
-            window.location = 'https://example.com';  // Redirect after successful signup
+            window.location = '/dash';  // Redirect after successful signup
         } else {
             alert("Signup Failed: " + data.error);
         }

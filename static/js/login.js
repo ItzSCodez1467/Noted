@@ -6,7 +6,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         console.log('No Auth Token Found!');
     } else {
         console.log('Auth Token Found! Redirecting to Dashboard.');
-        window.location = "https://example.com/"; // Redirect after successful validation
+        window.location = "/dash"; // Redirect after successful validation
     }
 });
 
@@ -54,7 +54,7 @@ document.getElementById('loginForm').addEventListener('submit', async function(e
         if (data.status === 201) {
             alert("Successfully Logged In!");
             setToken(data.token);
-            window.location = 'https://example.com';  // Redirect after successful login
+            window.location = '/dash';  // Redirect after successful login
         } else {
             alert("Login Failed: " + data.error);
         }
