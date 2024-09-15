@@ -36,6 +36,7 @@ class DBWorker:
         CREATE TABLE IF NOT EXISTS tags(
             tag_idx INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT UNIQUE,
             tag_name TEXT NOT NULL,
+            tag_color TEXT NOT NULL,
             user_idx INTEGER NOT NULL,
             created_on REAL NOT NULL,
             updated_on REAL NOT NULL,

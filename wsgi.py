@@ -1,4 +1,4 @@
-from models import Noted, DBWorker
+from models import Noted
 
 app = Noted()
 

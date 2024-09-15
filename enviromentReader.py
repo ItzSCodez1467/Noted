@@ -8,3 +8,7 @@ def getSecretKey() -> str:
 def getRecaptchaSecretKey() -> str:
     load_dotenv()
     return str(os.getenv('RECAPTCHA_SECRET_KEY'))
+
+def getRecaptchaSiteKey() -> str:
+    load_dotenv()
+    return str(os.getenv('RECAPTCHA_SITE_KEY'))

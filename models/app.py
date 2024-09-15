@@ -1,14 +1,17 @@
-from flask import Flask, render_template, request, jsonify, Response
-from .DBWorker import DBWorker, close
-from enviromentReader import getSecretKey, getRecaptchaSecretKey
-from secured import hashPassword, verify
+import sqlite3
 from collections.abc import Iterable
 from datetime import datetime, timedelta
-from typing import Union, Any, Tuple, List, Dict
-import sqlite3
-import jwt
 from functools import wraps
+from typing import Union, Any
+
+import jwt
 import requests
+from flask import Flask, render_template, request, jsonify, Response
+
+from enviromentReader import getSecretKey, getRecaptchaSecretKey, getRecaptchaSiteKey
+from secured import hashPassword, verify
+from .DBWorker import DBWorker, close
+
 
 class Noted:
 
@@ -33,7 +36,7 @@ class Noted:
         @app.route('/signup', methods=['GET', 'POST'])
         def signup():
             if request.method == 'GET':
-                return render_template('signup.html')
+                return render_template('signup.html', SITEKEY=getRecaptchaSiteKey())
             else:
                 try:
                     username = request.form.get('username')
@@ -56,14 +59,14 @@ class Noted:
                 except Exception as e:
                     print(e)
                     return jsonify({
-                        'status': 501,
+                        'status': 500,
                         'error': str(e)
-                    }), 501
+                    }), 500
 
         @app.route('/login', methods=['GET', 'POST'])
         def login():
             if request.method == 'GET':
-                return render_template('login.html')
+                return render_template('login.html', SITEKEY=getRecaptchaSiteKey())
             else:
                 try:
                     username = request.form.get('username')
@@ -104,9 +107,9 @@ class Noted:
                 except Exception as e:
                     print(e)
                     return jsonify({
-                        'status': 501,
+                        'status': 500,
                         'error': str(e)
-                    }), 501
+                    }), 500
 
         @app.route('/verifyToken', methods=['POST'])
         @self.user_auth()
@@ -133,6 +136,68 @@ class Noted:
         def dash():
             return render_template('dashboard.html')
 
+        @app.route('/getTag/<int:tag_idx>', methods=['GET'])
+        @self.user_auth()
+        def getTag(user_data, tag_idx):
+            try:
+                tagData, _ = self.pullTagByTagIDX(tag_idx)
+
+                if not tagData:
+                    return jsonify({'status': 404, 'error': 'Tag not found'}), 404
+
+                if tagData['user_idx'] != user_data['user_idx']:
+                    return jsonify({'status': 401, 'error': 'User not authorized'}), 401
+
+                return jsonify({'status': 200, 'data': tagData}), 200
+
+            except Exception as e:
+                print(e)
+                return jsonify({
+                    'status': 500,
+                    'error': str(e)
+                }), 500
+
+        @app.route('/newTag', methods=['POST'])
+        @self.user_auth()
+        def newTag(user_data):
+            try:
+                tag_name = request.form.get('tag_name')
+                tag_color = request.form.get('tag_color')
+                recaptcha_response = request.form.get('g-recaptcha-response')
+
+                if not self.verifyRecaptcha(recaptcha_response):
+                    return jsonify({'error': 'reCAPTCHA verification failed.'}), 400
+
+                if not tag_name or not tag_color:
+                    print("Missing tag_name or tag_color")
+                    return jsonify({
+                        'status': 400,
+                        'error': 'Data not fulfilled. Expected tag_name and tag_color.'
+                    }), 400
+                
+                conn, curr = self.dbw.connect()
+                q1 = 'INSERT INTO tags (tag_name, tag_color, user_idx, created_on, updated_on) VALUES (?, ?, ?, ?, ?)'
+                ts = float((datetime.utcnow() + timedelta(hours=5, minutes=30)).timestamp())
+                p1 = (str(tag_name), str(tag_color), int(user_data['user_idx']), ts, ts)
+                curr.execute(q1, p1)
+                conn.commit()
+                return jsonify({
+                    'status': 201,
+                    'message': 'Success!'
+                }), 201
+
+            except Exception as e:
+                print(e)
+                return jsonify({}), 500
+
+        @app.route('/newNote', methods=['GET', 'POST'])
+        @self.user_auth()
+        def newNote(user_data):
+            if request.method == 'GET':
+                return render_template('newNote.html')
+
+
+
         # Error handlers
         @app.errorhandler(404)
         def error_404(_):
@@ -146,46 +211,45 @@ class Noted:
         def decorator(f):
             @wraps(f)
             def decorated_function(*args, **kwargs):
-                token = request.headers.get('Authorization', '').split('Bearer ')[-1].strip()
-                try:
-                    tokenData = jwt.decode(
-                        token,
-                        key=self.SECRET.encode(),
-                        algorithms=['HS256'],
-                        options={
-                            "verify_signature": True,
-                            "verify_exp": True,
-                            "verify_nbf": False,
-                            "verify_iat": True,
-                            "verify_iss": False,
-                            "verify_aud": False,
-                            "verify_jti": False
-                        }
-                    )
-                except jwt.ExpiredSignatureError:
-                    # Token expired, return custom 401 response and stop further execution
-                    return jsonify({'status': 401, 'message': 'Token has expired', 'isValid': False}), 401
+                if request.method != 'GET':
+                    token = request.headers.get('Authorization', '').split('Bearer ')[-1].strip()
+                    try:
+                        tokenData = jwt.decode(
+                            token,
+                            key=self.SECRET.encode(),
+                            algorithms=['HS256'],
+                            options={
+                                "verify_signature": True,
+                                "verify_exp": True,
+                                "verify_nbf": False,
+                                "verify_iat": True,
+                                "verify_iss": False,
+                                "verify_aud": False,
+                                "verify_jti": False
+                            }
+                        )
+                    except jwt.ExpiredSignatureError:
+                        return jsonify({'status': 401, 'message': 'Token has expired', 'isValid': False}), 401
+                    except jwt.InvalidTokenError:
+                        return jsonify({'status': 401, 'message': 'Invalid token', 'isValid': False}), 401
+                    except Exception as e:
+                        return jsonify({'status': 500, 'message': f"An error occurred: {str(e)}", 'isValid': False}), 500
 
-                except jwt.InvalidTokenError:
-                    # Invalid token, return custom 401 response and stop further execution
-                    return jsonify({'status': 401, 'message': 'Invalid token', 'isValid': False}), 401
+                    # Fetch the user data using the username
+                    user_data, status_code = self.pullUserByUserName(tokenData['user'])
 
-                except Exception as e:
-                    # Handle any other unforeseen errors and stop further execution
-                    return jsonify({'status': 500, 'message': f"An error occurred: {str(e)}", 'isValid': False}), 500
+                    if user_data is None:
+                        return jsonify({'status': 401, 'message': 'User not found', 'isValid': False}), 401
 
-                # Now pull the user data by username
-                user_data, _ = self.pullUserByUserName(tokenData['user'])
-                user_data = dict(user_data)
+                    # Ensure user_data is a dictionary
+                    user_data = dict(user_data)
 
-                if not user_data:
-                    # If user data isn't found, return custom unauthorized response
-                    return jsonify({'status': 401, 'message': 'User not found', 'isValid': False}), 401
-
-                # Proceed with the actual route function if the token is valid
-                return f(user_data, *args, **kwargs)
+                    return f(user_data, *args, **kwargs)
+                else:
+                    return f(None, *args, **kwargs)
 
             return decorated_function
+
         return decorator
 
     def getNotesTaken(self) -> Iterable[bool, int]:
@@ -235,9 +299,9 @@ class Noted:
         except Exception as e:
             print(e)
             return jsonify({
-                'status': 501,
+                'status': 500,
                 'error': str(e)
-            }), 501
+            }), 500
         finally:
             close(conn)
 
@@ -261,7 +325,7 @@ class Noted:
             return row_dict, 200
         except Exception as e:
             print(f"Error in pullUserByUserName: {e}")
-            return None, 501
+            return None, 500
         finally:
             close(conn)
 
@@ -291,7 +355,7 @@ class Noted:
 
         except Exception as e:
             print(f"Error in pullNotesByUserIDX: {e}")
-            return None, 501
+            return None, 500
         finally:
             close(conn)
 
@@ -305,6 +369,27 @@ class Noted:
         result = res.json()
         return result.get('success')
 
+    def pullTagByTagIDX(self, tag_idx) -> Union[tuple[None, int], tuple[dict[Any, Any], int]]:
+        conn, curr = self.dbw.connect()
+        q1 = 'SELECT * FROM tags WHERE tag_idx = ?'
+        p1 = (tag_idx,)
+
+        try:
+            curr.execute(q1, p1)
+            row = curr.fetchone()
+
+            if row is None:
+                return None, 401
+
+            colum_names = ['tag_idx', 'tag_name', 'tag_color', 'user_idx', 'created_on', 'updated_on']
+            row_dict = dict(zip(colum_names, row))
+            return row_dict, 200
+
+        except Exception as e:
+            print(e)
+            return None, 500
+        finally:
+            close(conn)
 
     def run(self,
             host: str = '0.0.0.0',
