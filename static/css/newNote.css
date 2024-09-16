@@ -1,0 +1,88 @@
+@import url('https://fonts.googleapis.com/css2?family=Architects+Daughter&display=swap');
+
+body {
+    background-color: rgb(54, 54, 54) !important;
+    font-family: "Architects Daughter", cursive !important;
+    font-weight: 400 !important;
+    font-style: normal !important;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+}
+
+h1 {
+    color: white !important;  /* Ensure color is applied correctly */
+    font-size: 5em !important;
+    font-weight: 600 !important;  /* Font weight should be a numerical value */
+}
+
+p {
+    color: white; /* Ensure to remove important tag, as the options lits needs it to instead display tag colors */
+    font-size: 1.5em !important;
+    font-weight: 400 I !important;
+}
+
+h2 {
+    color: white !important;
+    font-size: 3em !important;
+    font-weight: 550 !important;
+}
+
+footer {
+    background-color: rgb(40, 40, 40) !important;
+    color: white !important;
+    padding: 20px;
+    text-align: center;
+    position: relative;
+    width: 100%;
+}
+
+/* Style for the dropdown container */
+#tags-container {
+    position: relative;
+    width: 300px;
+    margin: 20px 0;
+}
+
+#search-tags {
+    width: 100%;
+    padding: 8px;
+    margin-bottom: 8px;
+    box-sizing: border-box;
+}
+
+/* Style for the dropdown items */
+.dropdown-items {
+    max-height: 200px; /* Scrollable */
+    overflow-y: auto;
+    border: 2px solid #ffffff;
+    background-color: #050505;
+    position: absolute;
+    width: 100%;
+    z-index: 1000;
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+}
+
+/* Style for individual items */
+.dropdown-item {
+    padding: 10px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
+
+.dropdown-item:hover {
+    background-color: #f1f1f1;
+}
+
+/* Hide the dropdown initially */
+.dropdown-items {
+    display: none;
+}
+
+/* Show when there are options */
+.dropdown-items.show {
+    display: block;
+}

@@ -2,7 +2,7 @@ import sqlite3
 from collections.abc import Iterable
 from datetime import datetime, timedelta
 from functools import wraps
-from typing import Union, Any
+from typing import Union, Any, Tuple, List, Dict
 
 import jwt
 import requests
@@ -157,6 +157,17 @@ class Noted:
                     'error': str(e)
                 }), 500
 
+        @app.route('/getTags', methods=['POST'])
+        @self.user_auth()
+        def getTags(user_data):
+            tags, status = self.pullTagsByUserIDX(user_data['user_idx'])
+
+            if status == 404:
+                return jsonify({'status': 404, 'error': 'No tags found'}), 404
+
+            return jsonify({'status': 200, 'data': tags}), 200
+
+
         @app.route('/newTag', methods=['POST'])
         @self.user_auth()
         def newTag(user_data):
@@ -190,11 +201,10 @@ class Noted:
                 print(e)
                 return jsonify({}), 500
 
-        @app.route('/newNote', methods=['GET', 'POST'])
-        @self.user_auth()
-        def newNote(user_data):
+        @app.route('/newNote', methods=['GET'])
+        def newNote():
             if request.method == 'GET':
-                return render_template('newNote.html')
+                return render_template('newNote.html', SITEKEY=getRecaptchaSiteKey())
 
 
 
@@ -211,42 +221,33 @@ class Noted:
         def decorator(f):
             @wraps(f)
             def decorated_function(*args, **kwargs):
-                if request.method != 'GET':
-                    token = request.headers.get('Authorization', '').split('Bearer ')[-1].strip()
-                    try:
-                        tokenData = jwt.decode(
-                            token,
-                            key=self.SECRET.encode(),
-                            algorithms=['HS256'],
-                            options={
-                                "verify_signature": True,
-                                "verify_exp": True,
-                                "verify_nbf": False,
-                                "verify_iat": True,
-                                "verify_iss": False,
-                                "verify_aud": False,
-                                "verify_jti": False
-                            }
-                        )
-                    except jwt.ExpiredSignatureError:
-                        return jsonify({'status': 401, 'message': 'Token has expired', 'isValid': False}), 401
-                    except jwt.InvalidTokenError:
-                        return jsonify({'status': 401, 'message': 'Invalid token', 'isValid': False}), 401
-                    except Exception as e:
-                        return jsonify({'status': 500, 'message': f"An error occurred: {str(e)}", 'isValid': False}), 500
+                token = request.headers.get('Authorization', '').replace('Bearer ', '').strip()
+                if not token:
+                    return jsonify({'status': 401, 'message': 'Token is missing', 'isValid': False}), 401
 
-                    # Fetch the user data using the username
-                    user_data, status_code = self.pullUserByUserName(tokenData['user'])
+                try:
+                    tokenData = jwt.decode(
+                        token,
+                        key=self.SECRET.encode(),
+                        algorithms=['HS256'],
+                    )
+                except jwt.ExpiredSignatureError:
+                    return jsonify({'status': 401, 'message': 'Token has expired', 'isValid': False}), 401
+                except jwt.InvalidTokenError:
+                    return jsonify({'status': 401, 'message': 'Invalid token', 'isValid': False}), 401
+                except Exception as e:
+                    return jsonify({'status': 500, 'message': f"An error occurred: {str(e)}", 'isValid': False}), 500
 
-                    if user_data is None:
-                        return jsonify({'status': 401, 'message': 'User not found', 'isValid': False}), 401
+                # Fetch the user data using the username
+                user_data, status_code = self.pullUserByUserName(tokenData.get('user'))
 
-                    # Ensure user_data is a dictionary
-                    user_data = dict(user_data)
+                if user_data is None:
+                    return jsonify({'status': 401, 'message': 'User not found', 'isValid': False}), 401
 
-                    return f(user_data, *args, **kwargs)
-                else:
-                    return f(None, *args, **kwargs)
+                # Ensure user_data is a dictionary
+                user_data = dict(user_data)
+
+                return f(user_data, *args, **kwargs)
 
             return decorated_function
 
@@ -350,14 +351,12 @@ class Noted:
                 row_dict['readable_updated_on'] = readable_update_ts
                 rows_dict.append(row_dict)
             return rows_dict
-
-
-
         except Exception as e:
             print(f"Error in pullNotesByUserIDX: {e}")
             return None, 500
         finally:
             close(conn)
+
 
     def verifyRecaptcha(self, recaptcha_res):
         payload = {
@@ -368,6 +367,27 @@ class Noted:
         res = requests.post('https://www.google.com/recaptcha/api/siteverify', data=payload)
         result = res.json()
         return result.get('success')
+
+    def pullTagsByUserIDX(self, user_idx) -> Union[tuple[None, int], tuple[list[dict[Any, Any]], int]]:
+        conn, curr = self.dbw.connect()
+        q1 = 'SELECT * FROM tags WHERE user_idx = ?'
+        p1 = (user_idx,)
+
+        try:
+            curr.execute(q1, p1)
+            rows = curr.fetchall()
+            if rows is None:
+                return None, 404
+
+            rows_dict = []
+            for row in rows:
+                colum_names = ['tag_idx', 'tag_name', 'tag_color', 'user_idx', 'created_on', 'updated_on']
+                row_dict = dict(zip(colum_names, row))
+                rows_dict.append(row_dict)
+            return rows_dict, 200
+        except Exception as e:
+            print(f'Error in pullTagsByUserIDX: {e}')
+            close(conn)
 
     def pullTagByTagIDX(self, tag_idx) -> Union[tuple[None, int], tuple[dict[Any, Any], int]]:
         conn, curr = self.dbw.connect()

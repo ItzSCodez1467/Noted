@@ -41,30 +41,11 @@ function truncateText(text, max = 18) {
 // Function to create a note card HTML
 async function createNoteCard(noteData) {
     const tagInfo = await getTagInfo(noteData.tag);  // Fetch tag details from API
-    
-    // Function to check if a color is dark
-    function isColorDark(color) {
-        // Convert hex color to RGB
-        const rgb = parseInt(color.substring(1), 16);
-        const r = (rgb >> 16) & 0xff;
-        const g = (rgb >>  8) & 0xff;
-        const b = (rgb >>  0) & 0xff;
-        
-        // Calculate luminance
-        const luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-        
-        // Return true if luminance is less than a threshold (adjust as needed)
-        return luminance < 128;
-    }
-
-    // Determine text color based on tag color brightness
-    const textColor = isColorDark(tagInfo.tag_color) ? '#FFFFFF' : '#000000';
 
     return `
       <div class="card" style="width: 18rem; margin-bottom: 20px;">
-        <div class="card-header" style="color: ${textColor};">
-          <span class="tag-circle" style="background-color: ${tagInfo.tag_color}; border-radius: 50%; display: inline-block; width: 15px; height: 15px; margin-right: 10px;"></span>
-          Tagged: ${tagInfo.tag_name || 'N/A'}
+        <div class="card-header">
+          Tagged: <p style="color: ${tagInfo.tag_color || white} !important;">${tagInfo.tag_name || 'N/A'}</p>
           Last Updated: ${noteData.readable_updated_on || 'N/A'}
         </div>
         <div class="card-body">
