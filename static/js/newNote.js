@@ -85,9 +85,34 @@ document.addEventListener('DOMContentLoaded', async () => {
 document.getElementById('newNoteForm').addEventListener('submit', async function(event) {
     event.preventDefault();
     const formdata = new FormData();
+    const authHeaders = getAuthHeaders(getToken(), 'multipart/form-data');
     formdata.append('note_name', document.getElementById('name').value);
     formdata.append('note_content', document.getElementById('content').value);
     formdata.append('tag', document.getElementById('selected-tag-idx').getAttribute('value'));
     formdata.append('g-recaptcha-response', grecaptcha.getResponse());
+
+    try {
+        const req = await fetch('/makeNote', {
+            method: 'POST',
+            headers: authHeaders,
+            body: authHeaders
+        })
+
+        const res = await req.json();
+
+        if (res.status !== 201) {
+            alert("Success!");
+            window.location = '/dash';
+            return;
+        }
+
+        alert(`Error: ${error}`);
+        return;
+
+    }
+    catch (error) {
+        alert(`Error: ${error}`);
+        return;
+    }
 
 })
